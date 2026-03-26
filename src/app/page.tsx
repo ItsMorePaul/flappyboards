@@ -204,7 +204,7 @@ export default function Home() {
             LAUNCH DISPLAY
           </Link>
           <a
-            href="https://github.com/vxcozy"
+            href="https://github.com/vxcozy/flappyboards"
             target="_blank"
             rel="noopener noreferrer"
             style={{
