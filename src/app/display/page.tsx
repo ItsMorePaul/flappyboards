@@ -25,9 +25,6 @@ export default function DisplayPage() {
   const { audioEngine } = useAudioEngine();
   const rotatorRef = useRef(new ContentRotator(QUOTES));
   const rotationCountRef = useRef(0);
-  const musicSource = useMusicStore((s) => s.source);
-  const musicIsPlaying = useMusicStore((s) => s.isPlaying);
-  const currentTrack = useMusicStore((s) => s.currentTrack);
 
   // Read settings from store
   const flipSpeed = useSettingsStore((s) => s.flipSpeed);
@@ -54,9 +51,11 @@ export default function DisplayPage() {
   const cycleNext = useCallback(async () => {
     rotationCountRef.current++;
     // Every 3rd rotation, show "Now Playing" if music is active
+    // Read music state directly from store to avoid reactive subscriptions
+    const { isPlaying, source, currentTrack } = useMusicStore.getState();
     if (
-      musicIsPlaying &&
-      musicSource !== "off" &&
+      isPlaying &&
+      source !== "off" &&
       currentTrack &&
       rotationCountRef.current % 3 === 0
     ) {
@@ -66,7 +65,7 @@ export default function DisplayPage() {
     }
     const content = rotatorRef.current.next();
     await showMessage(content.lines);
-  }, [showMessage, musicIsPlaying, musicSource, currentTrack]);
+  }, [showMessage]);
 
   // Initial message + auto-rotation
   useEffect(() => {
@@ -106,7 +105,7 @@ export default function DisplayPage() {
         <SplitFlapBoard ref={boardRef} initialBoard={initialBoard} />
       </div>
 
-      {/* Footer */}
+      {/* Footer — hidden for now, can be re-enabled by removing display:none */}
       <div
         style={{
           position: "fixed",
@@ -114,7 +113,7 @@ export default function DisplayPage() {
           left: 0,
           right: 0,
           padding: "20px 32px",
-          display: "flex",
+          display: "none",
           justifyContent: "space-between",
           alignItems: "center",
           zIndex: 20,

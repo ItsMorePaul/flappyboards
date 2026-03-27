@@ -30,6 +30,16 @@ interface SplitFlapBoardProps {
   initialBoard: BoardState;
 }
 
+interface TileFlipTask {
+  row: number;
+  col: number;
+  flipPath: number[];
+  startTime: number;
+  tileRef: { flipTo: (code: number, duration: number) => Promise<void> };
+  onFlipStep?: (row: number, col: number) => void;
+  flipSpeed: number;
+}
+
 const SplitFlapBoard = forwardRef<SplitFlapBoardRef, SplitFlapBoardProps>(
   function SplitFlapBoard({ initialBoard }, ref) {
     const rowRefs = useRef<React.RefObject<SplitFlapRowRef | null>[]>(
@@ -43,7 +53,8 @@ const SplitFlapBoard = forwardRef<SplitFlapBoardRef, SplitFlapBoardProps>(
         staggerDelay: number = 35,
         onFlipStep?: (row: number, col: number) => void
       ) => {
-        const flipPromises: Promise<void>[] = [];
+        // Pre-calculate all tile tasks with their start times
+        const tasks: TileFlipTask[] = [];
 
         for (let row = 0; row < BOARD_ROWS; row++) {
           for (let col = 0; col < BOARD_COLS; col++) {
@@ -64,22 +75,83 @@ const SplitFlapBoard = forwardRef<SplitFlapBoardRef, SplitFlapBoardProps>(
             // Calculate stagger: left-to-right, top-to-bottom with jitter
             const linearIndex = row * BOARD_COLS + col;
             const jitter = (Math.random() - 0.5) * staggerDelay * 0.3;
-            const delay = linearIndex * staggerDelay + jitter;
+            const startTime = linearIndex * staggerDelay + jitter;
 
-            const flipTile = async () => {
-              await new Promise((r) => setTimeout(r, Math.max(0, delay)));
-
-              for (const stepCode of flipPath) {
-                onFlipStep?.(row, col);
-                await tileRef.flipTo(stepCode, flipSpeed);
-              }
-            };
-
-            flipPromises.push(flipTile());
+            tasks.push({
+              row,
+              col,
+              flipPath,
+              startTime: Math.max(0, startTime),
+              tileRef,
+              onFlipStep,
+              flipSpeed,
+            });
           }
         }
 
-        await Promise.all(flipPromises);
+        if (tasks.length === 0) return;
+
+        // Use a single rAF scheduling loop instead of per-tile setTimeouts
+        return new Promise<void>((resolve) => {
+          const startTimestamp = performance.now();
+          // Track each task's current flip step and its completion promise
+          const taskState = tasks.map(() => ({
+            started: false,
+            stepIndex: 0,
+            flipping: false,
+            done: false,
+            currentPromise: null as Promise<void> | null,
+          }));
+          let allDone = false;
+
+          function tick() {
+            if (allDone) return;
+
+            const elapsed = performance.now() - startTimestamp;
+            let pendingCount = 0;
+
+            for (let i = 0; i < tasks.length; i++) {
+              const state = taskState[i];
+              if (state.done) continue;
+
+              pendingCount++;
+              const task = tasks[i];
+
+              // Check if it's time to start this tile
+              if (!state.started && elapsed >= task.startTime) {
+                state.started = true;
+              }
+
+              if (!state.started || state.flipping) continue;
+
+              // Start the next flip step
+              if (state.stepIndex < task.flipPath.length) {
+                state.flipping = true;
+                task.onFlipStep?.(task.row, task.col);
+                const stepCode = task.flipPath[state.stepIndex];
+                state.currentPromise = task.tileRef
+                  .flipTo(stepCode, task.flipSpeed)
+                  .then(() => {
+                    state.stepIndex++;
+                    state.flipping = false;
+                    if (state.stepIndex >= task.flipPath.length) {
+                      state.done = true;
+                    }
+                  });
+              }
+            }
+
+            if (pendingCount === 0) {
+              allDone = true;
+              resolve();
+              return;
+            }
+
+            requestAnimationFrame(tick);
+          }
+
+          requestAnimationFrame(tick);
+        });
       },
       []
     );

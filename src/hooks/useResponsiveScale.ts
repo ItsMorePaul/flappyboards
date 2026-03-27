@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { BOARD_ROWS, BOARD_COLS } from "@/lib/vestaboard/layout";
 
 // Base tile dimensions (from CSS custom properties)
@@ -12,6 +12,7 @@ const BOARD_PADDING_Y = 32; // 16px each side
 
 export function useResponsiveScale() {
   const [scale, setScale] = useState(1);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const calculate = useCallback(() => {
     const vw = window.innerWidth;
@@ -30,8 +31,17 @@ export function useResponsiveScale() {
 
   useEffect(() => {
     calculate();
-    window.addEventListener("resize", calculate);
-    return () => window.removeEventListener("resize", calculate);
+
+    const debouncedResize = () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(calculate, 200);
+    };
+
+    window.addEventListener("resize", debouncedResize);
+    return () => {
+      window.removeEventListener("resize", debouncedResize);
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
   }, [calculate]);
 
   return scale;

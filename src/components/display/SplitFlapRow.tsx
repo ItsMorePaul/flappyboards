@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useImperativeHandle, forwardRef, createRef } from "react";
+import { memo, useRef, useImperativeHandle, forwardRef, createRef } from "react";
 import SplitFlapTile, { type SplitFlapTileRef } from "./SplitFlapTile";
 import { BOARD_COLS } from "@/lib/vestaboard/layout";
 
@@ -13,34 +13,36 @@ interface SplitFlapRowProps {
   codes: number[];
 }
 
-const SplitFlapRow = forwardRef<SplitFlapRowRef, SplitFlapRowProps>(
-  function SplitFlapRow({ rowIndex, codes }, ref) {
-    const tileRefs = useRef<React.RefObject<SplitFlapTileRef | null>[]>(
-      Array.from({ length: BOARD_COLS }, () => createRef<SplitFlapTileRef>())
-    );
+const SplitFlapRow = memo(
+  forwardRef<SplitFlapRowRef, SplitFlapRowProps>(
+    function SplitFlapRow({ rowIndex, codes }, ref) {
+      const tileRefs = useRef<React.RefObject<SplitFlapTileRef | null>[]>(
+        Array.from({ length: BOARD_COLS }, () => createRef<SplitFlapTileRef>())
+      );
 
-    useImperativeHandle(
-      ref,
-      () => ({
-        getTileRef: (col: number) => tileRefs.current[col]?.current ?? null,
-      }),
-      []
-    );
+      useImperativeHandle(
+        ref,
+        () => ({
+          getTileRef: (col: number) => tileRefs.current[col]?.current ?? null,
+        }),
+        []
+      );
 
-    return (
-      <>
-        {Array.from({ length: BOARD_COLS }, (_, col) => (
-          <SplitFlapTile
-            key={col}
-            ref={tileRefs.current[col]}
-            initialCode={codes[col] ?? 0}
-            row={rowIndex}
-            col={col}
-          />
-        ))}
-      </>
-    );
-  }
+      return (
+        <>
+          {Array.from({ length: BOARD_COLS }, (_, col) => (
+            <SplitFlapTile
+              key={col}
+              ref={tileRefs.current[col]}
+              initialCode={codes[col] ?? 0}
+              row={rowIndex}
+              col={col}
+            />
+          ))}
+        </>
+      );
+    }
+  )
 );
 
 SplitFlapRow.displayName = "SplitFlapRow";
